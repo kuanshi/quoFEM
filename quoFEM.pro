@@ -108,7 +108,10 @@ SOURCES += main.cpp\
     UQ/simcenterUQ/SimCenterUQResultsSurrogate.cpp \
     UQ/simcenterUQ/SurrogateNoDoEInputWidget.cpp \
     UQ/simcenterUQ/SurrogateDoEInputWidget.cpp \
-    UQ/simcenterUQ/SurrogateMFInputWidget.cpp
+    UQ/simcenterUQ/SurrogateMFInputWidget.cpp \
+    UQ/simcenterUQ/SimCenterUQInputPLoM.cpp \
+    UQ/simcenterUQ/SimCenterUQResultsPLoM.cpp \
+    UQ/simcenterUQ/PLoMInputWidget.cpp \
 
 
 HEADERS  += MainWindow.h \
@@ -170,7 +173,11 @@ HEADERS  += MainWindow.h \
     UQ/simcenterUQ/SimCenterUQResultsSampling.h \    
     UQ/simcenterUQ/SurrogateNoDoEInputWidget.h \
     UQ/simcenterUQ/SurrogateDoEInputWidget.h \
-    UQ/simcenterUQ/SurrogateMFInputWidget.h
+    UQ/simcenterUQ/SurrogateMFInputWidget.h \
+    UQ/simcenterUQ/SurrogateMFInputWidget.h \
+    UQ/simcenterUQ/SimCenterUQInputPLoM.h \
+    UQ/simcenterUQ/SimCenterUQResultsPLoM.h \
+    UQ/simcenterUQ/PLoMInputWidget.h \
 
 FORMS    += mainwindow.ui
 
