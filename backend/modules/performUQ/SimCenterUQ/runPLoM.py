@@ -171,13 +171,19 @@ class runPLoM:
         pd.to_csv(inputXY, sept=',', header=True, index=False)
         self.inputXY = inputXY
 
+        # surrogateInfo new sample ratio
+        self.newSampleRatio = surrogateInfo.get('newSampleRatio', 0)
+
 
     def train_model(self, model_name='SurrogatePLoM'):
         db_path = os.path.join(self.work_dir, 'templatedir')
         self.modelPLoM = PLoM(model_name=model_name, data=self.inputXY, separator=',', col_header=True, db_path=db_path)
-        tasks = ['DataNormalization','RunPCA','RunKDE']
+        if self.newSampleRatio == 0:
+            tasks = ['DataNormalization','RunPCA','RunKDE']
+        else:
+            tasks = ['DataNormalization','RunPCA','RunKDE','ISDEGeneration']
         self.modelPLoM.ConfigTasks(task_list=tasks)
-        self.modelPLoM.RunAlgorithm()
+        self.modelPLoM.RunAlgorithm(n_mc = self.newSampleRatio)
 
 
     def save_model(self):

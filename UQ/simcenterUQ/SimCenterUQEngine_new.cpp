@@ -52,7 +52,6 @@ UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
 #include <SimCenterUQInputSampling.h>
 #include <SimCenterUQInputSurrogate.h>
-#include <SimCenterUQInputPLoM.h>
 
 //#include <SimCenterUQInputReliability.h>
 #include <SimCenterUQInputSensitivity.h>
@@ -81,7 +80,6 @@ SimCenterUQEngine::SimCenterUQEngine(InputWidgetParameters *param,InputWidgetFEM
     theEngineSelectionBox->addItem(tr("Forward Propagation"));
     theEngineSelectionBox->addItem(tr("Sensitivity Analysis"));
     theEngineSelectionBox->addItem(tr("Train GP Surrogate Model"));
-    theEngineSelectionBox->addItem(tr("PLoM Model"));
     theEngineSelectionBox->setMinimumWidth(600);
 
     theSelectionLayout->addWidget(label);
@@ -102,12 +100,10 @@ SimCenterUQEngine::SimCenterUQEngine(InputWidgetParameters *param,InputWidgetFEM
     theSamplingEngine = new SimCenterUQInputSampling();
     theSensitivityEngine = new SimCenterUQInputSensitivity();
     theSurrogateEngine = new SimCenterUQInputSurrogate(theParameters,theFemWidget,theEdpWidget);
-    thePLoMEngine = new SimCenterUQInputPLoM(theParameters,theFemWidget,theEdpWidget);
 
     theStackedWidget->addWidget(theSamplingEngine);
     theStackedWidget->addWidget(theSensitivityEngine);
     theStackedWidget->addWidget(theSurrogateEngine);
-    theStackedWidget->addWidget(thePLoMEngine);
 
 
     layout->addWidget(theStackedWidget);
@@ -156,11 +152,6 @@ void SimCenterUQEngine::engineSelectionChanged(const QString &arg1)
        theCurrentEngine = theSurrogateEngine;
        // reset other parts
        theFemWidget->setFEMforGP("GPmodel");   // set it to be GP-FEM
-    } else if (arg1 == QString("PLoM Model")) {
-       theStackedWidget->setCurrentIndex(3);
-       theCurrentEngine = thePLoMEngine;
-       // reset other parts
-       theFemWidget->setFEMforGP("GPmodel");   // TODO: CHANGE TO PLOM
     } else {
       qDebug() << "ERROR .. SimCenterUQEngine selection .. type unknown: " << arg1;
     }

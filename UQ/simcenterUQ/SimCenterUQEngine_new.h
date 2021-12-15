@@ -89,7 +89,6 @@ private:
    UQ_Engine *theSurrogateEngine;
    UQ_Engine *theSensitivityEngine;
    UQ_Engine *theSamplingEngine;
-   UQ_Engine *thePLoMEngine;
 
    InputWidgetParameters *theParameters;
    InputWidgetFEM *theFemWidget;

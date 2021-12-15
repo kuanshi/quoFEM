@@ -1,5 +1,5 @@
-#ifndef SimCenterUQ_ENGINE_H
-#define SimCenterUQ_ENGINE_H
+#ifndef SimCenterUQ_INPUT_PLOM_H
+#define SimCenterUQ_INPUT_PLOM_H
 
 /* *****************************************************************************
 Copyright (c) 2016-2017, The Regents of the University of California (Regents).
@@ -37,63 +37,74 @@ UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
 *************************************************************************** */
 
-// Written: fmckenna
-
 #include <UQ_Engine.h>
 
-class QComboBox;
-class QStackedWidget;
-class UQ_Results;
+#include <QGroupBox>
+#include <QVector>
+#include <QVBoxLayout>
+#include <QComboBox>
+#include <QPushButton>
+
+class SimCenterUQSurrogateResults;
+class SimCenterUQResults;
+class QCheckBox;
 class RandomVariablesContainer;
-class InputWidgetEDP;
+class QStackedWidget;
+class UQ_MethodInputWidget;
 class InputWidgetParameters;
+class InputWidgetEDP;
 class InputWidgetFEM;
 
-class SimCenterUQEngine : public UQ_Engine
+class SimCenterUQInputPLoM : public UQ_Engine
 {
     Q_OBJECT
 public:
-    explicit SimCenterUQEngine(InputWidgetParameters *param,InputWidgetFEM *femWidget,InputWidgetEDP *edpWidget, QWidget *parent = 0);
-    virtual ~SimCenterUQEngine();
+    explicit SimCenterUQInputPLoM(InputWidgetParameters *param,InputWidgetFEM *femwidget,InputWidgetEDP *edpwidget, QWidget *parent = 0);
+    ~SimCenterUQInputPLoM();
 
-    int getMaxNumParallelTasks(void);
     bool outputToJSON(QJsonObject &jsonObject);
     bool inputFromJSON(QJsonObject &jsonObject);
     bool outputAppDataToJSON(QJsonObject &jsonObject);
     bool inputAppDataFromJSON(QJsonObject &jsonObject);
 
     int processResults(QString &filenameResults, QString &filenameTab);
-    RandomVariablesContainer *getParameters();
+
     UQ_Results *getResults(void);
+    RandomVariablesContainer  *getParameters();
 
-    QString getProcessingScript();
+    int getMaxNumParallelTasks(void);
     QString getMethodName();
-
-    bool copyFiles(QString &fileName);
-
+    bool copyFiles(QString &fileDir);
+    QVBoxLayout *mLayout;
 
 signals:
-    void onUQ_EngineChanged(void);
-    void onNumModelsChanged(int newNum);
 
 public slots:
-    void engineSelectionChanged(const QString &arg1);
-    void numModelsChanged(int newNum);
+   void clear(void);
+   void onIndexChanged(const QString &arg1);
+   void numModelsChanged(int numModels);
 
 private:
-   QComboBox   *theEngineSelectionBox;
-   QStackedWidget *theStackedWidget;
+    QVBoxLayout *layout;
+    QWidget     *methodSpecific;
+    QComboBox   *inpMethod;
+    QLineEdit   *numSamples;
+    QLineEdit   *randomSeed;
 
-   UQ_Engine *theCurrentEngine;
-   UQ_Engine *theOldEngine;
-   UQ_Engine *theSurrogateEngine;
-   UQ_Engine *theSensitivityEngine;
-   UQ_Engine *theSamplingEngine;
-   UQ_Engine *thePLoMEngine;
+    QComboBox   *uqSelection;
+    QWidget     *uqSpecific;
 
-   InputWidgetParameters *theParameters;
-   InputWidgetFEM *theFemWidget;
-   InputWidgetEDP *theEdpWidget;
+    RandomVariablesContainer *theRandomVariables;
+    SimCenterUQSurrogateResults *results;
+
+    QStackedWidget *theStackedWidget;
+    UQ_MethodInputWidget *theInpCurrentMethod;
+    UQ_MethodInputWidget *theDoE, *theData, *theMultiFidelity;
+
+    InputWidgetParameters *theParameters;
+    InputWidgetEDP *theEdpWidget;
+    InputWidgetFEM *theFemWidget;
+
 };
 
-#endif // SimCenterUQ_ENGINE_H
+#endif // SimCenterUQ_INPUT_PLOM_H
