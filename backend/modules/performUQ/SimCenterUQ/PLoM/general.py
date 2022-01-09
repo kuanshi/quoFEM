@@ -8,16 +8,16 @@ from collections import Counter
 
 
 ITEM_LIST_DATANORM = ['X_range','X_min','X_scaled','X_scaled_mean']
-ITEM_LIST_RUNPCA = ['X_PCA','EigenValue_PCA','EigenVector_PCA','NumComp_PCA']
-ITEM_LIST_RUNKDE = ['s_v','c_v','hat_s_v','X_KDE','EigenValues_KDE','KDE_g','KDE_m','KDE_a','KDE_Z']
+ITEM_LIST_RUNPCA = ['X_PCA','EigenValue_PCA','EigenVector_PCA','NumComp_PCA','Error_PCA']
+ITEM_LIST_RUNKDE = ['s_v','c_v','hat_s_v','X_KDE','EigenValues_KDE','KDE_g','KDE_m','KDE_a','KDE_Z','KDE_Eigen']
 ITEM_LIST_ISDEGENE = ['Errors','X_new']
 ITEM_LIST = ['basic']+['constraints_file']+['X0','N','n']+ITEM_LIST_DATANORM+ITEM_LIST_RUNPCA \
     +ITEM_LIST_RUNKDE+ITEM_LIST_ISDEGENE # all variables in the database
 ITEM_ADDS = ['/'+x for x in ITEM_LIST] # HDFStore ABSOLUTE path-names
 ATTR_LIST = [None,None,'X','N','n',
     'alpha','x_min','X_scaled','x_mean',
-    'H','mu','phi','nu',
-    's_v','c_v','hat_s_v','K','b','g','m','a','Z',
+    'H','mu','phi','nu','errPCA',
+    's_v','c_v','hat_s_v','K','b','g','m','a','Z','eigenKDE',
     'errors','Xnew']
 ATTR_MAP = dict(zip(ITEM_ADDS, ATTR_LIST))
 FULL_TASK_LIST = ['DataNormalization','RunPCA','RunKDE','ISDEGeneration']

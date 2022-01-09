@@ -956,87 +956,88 @@ void SimCenterUQResultsPLoM::summarySurrogate(QScrollArea *&sa)
     markerlist[1]->setVisible(false);
 
     // adding extra figure for KDE eigen values
-    QScatterSeries *series_KDE = new QScatterSeries;
-    QLineSeries *l_KDE = new QLineSeries;
-    QLineSeries *l_cutoff_kde = new QLineSeries;
-    int alpha_kde = 200;
-    series_KDE->setMarkerSize(10.0);
-    series_KDE->setColor(QColor(0, 114, 178, alpha));
-    series_KDE->setBorderColor(QColor(255,255,255,0));
-    l_KDE->setColor(QColor(0, 114, 178, alpha));
-    l_cutoff_kde->setColor(QColor(255, 0, 0, alpha));
-    QWidget *container_kde = new QWidget();
-    QGridLayout *chartAndNugget_kde = new QGridLayout(container_kde);
-    QChart *chart_KDE = new QChart;
-    QChartView *chartView_KDE = new QChartView(chart_KDE);
-    chart_KDE->setAnimationOptions(QChart::AllAnimations);
-    chartView_CV->setRenderHint(QPainter::Antialiasing);
-    QJsonArray yKDE= kdeEigen;
-    maxy=-INFINITY;
-    miny=INFINITY;
-    maxx=-INFINITY;
-    minx=INFINITY;
-    for (int i=0; i<yKDE.size(); i++) {
-        if (didLogtransform) {
-            series_KDE->append(i+1, yKDE[i].toDouble());
-            maxx = std::max(maxx,double(i+1));
-            minx = std::min(minx,double(i+1));
-            maxy = std::max(maxy,yKDE[i].toDouble());
-            miny = std::min(miny,yKDE[i].toDouble());
-            l_KDE->append(i+1, yKDE[i].toDouble());
-        } else {
-            series_PCA->append(i+1, yKDE[i].toDouble());
-            maxx = std::max(maxx,double(i+1));
-            minx = std::min(minx,double(i+1));
-            maxy = std::max(maxy,yKDE[i].toDouble());
-            miny = std::min(miny,yKDE[i].toDouble());
-            l_KDE->append(i+1, yKDE[i].toDouble());
+    if (kdeEigen.size() > 0) {
+        QScatterSeries *series_KDE = new QScatterSeries;
+        QLineSeries *l_KDE = new QLineSeries;
+        QLineSeries *l_cutoff_kde = new QLineSeries;
+        int alpha_kde = 200;
+        series_KDE->setMarkerSize(10.0);
+        series_KDE->setColor(QColor(0, 114, 178, alpha));
+        series_KDE->setBorderColor(QColor(255,255,255,0));
+        l_KDE->setColor(QColor(0, 114, 178, alpha));
+        l_cutoff_kde->setColor(QColor(255, 0, 0, alpha));
+        QWidget *container_kde = new QWidget();
+        QGridLayout *chartAndNugget_kde = new QGridLayout(container_kde);
+        QChart *chart_KDE = new QChart;
+        QChartView *chartView_KDE = new QChartView(chart_KDE);
+        chart_KDE->setAnimationOptions(QChart::AllAnimations);
+        chartView_CV->setRenderHint(QPainter::Antialiasing);
+        QJsonArray yKDE= kdeEigen;
+        maxy=-INFINITY;
+        miny=INFINITY;
+        maxx=-INFINITY;
+        minx=INFINITY;
+        for (int i=0; i<yKDE.size(); i++) {
+            if (didLogtransform) {
+                series_KDE->append(i+1, yKDE[i].toDouble());
+                maxx = std::max(maxx,double(i+1));
+                minx = std::min(minx,double(i+1));
+                maxy = std::max(maxy,yKDE[i].toDouble());
+                miny = std::min(miny,yKDE[i].toDouble());
+                l_KDE->append(i+1, yKDE[i].toDouble());
+            } else {
+                series_PCA->append(i+1, yKDE[i].toDouble());
+                maxx = std::max(maxx,double(i+1));
+                minx = std::min(minx,double(i+1));
+                maxy = std::max(maxy,yKDE[i].toDouble());
+                miny = std::min(miny,yKDE[i].toDouble());
+                l_KDE->append(i+1, yKDE[i].toDouble());
+            }
+            if (i == (kdeComp-2)) {
+                l_cutoff_kde->append(0, yKDE[i].toDouble());
+                l_cutoff_kde->append(i+1, yKDE[i].toDouble());
+            }
+            if (yKDE[i].toDouble() < 0.01*yKDE[kdeComp-2].toDouble()) {
+                break;
+            }
         }
-        if (i == (kdeComp-2)) {
-            l_cutoff_kde->append(0, yKDE[i].toDouble());
-            l_cutoff_kde->append(i+1, yKDE[i].toDouble());
-        }
-        if (yKDE[i].toDouble() < 0.01*yKDE[kdeComp-2].toDouble()) {
-            break;
-        }
+        // set axis
+        inteval = maxy - miny;
+        maxy = maxy + inteval*0.1;
+        l_cutoff_kde->append(maxx, yKDE[kdeComp-2].toDouble());
+        QValueAxis *axisX_kde = new QValueAxis();
+        QLogValueAxis *axisY_kde = new QLogValueAxis();
+        axisX_kde->setLabelFormat("%.0f");
+        axisY_kde->setLabelFormat("%.6f");
+        axisX_kde->setTitleText(QString("Number of Component"));
+        axisY_kde->setTitleText(QString("Diff. Maps Eigenvalue"));
+        axisX_kde->setRange(minx, maxx);
+        axisY_kde->setRange(miny, maxy);
+        chart_KDE->addSeries(series_KDE);
+        chart_KDE->addSeries(l_KDE);
+        series_KDE->setName("Diff. Maps Eigenvalue");
+        chart_KDE->addSeries(l_cutoff_kde);
+        l_cutoff_kde->setName("Mininum eigen considered");
+        chart_KDE->setAxisX(axisX_kde, series_KDE);
+        chart_KDE->setAxisY(axisY_kde, series_KDE);
+        chart_KDE->setAxisX(axisX_kde, l_KDE);
+        chart_KDE->setAxisY(axisY_kde, l_KDE);
+        chart_KDE->setAxisX(axisX_kde, l_cutoff_kde);
+        chart_KDE->setAxisY(axisY_kde, l_cutoff_kde);
+        // set fontsize
+        QFont chartFont_kde;
+        chartFont_kde.setPixelSize(12);
+        chart_PCA->setFont(chartFont_kde);
+        axisX->setLabelsFont(chartFont_kde);
+        axisY->setLabelsFont(chartFont_kde);
+        axisX->setTitleFont(chartFont_kde);
+        axisY->setTitleFont(chartFont_kde);
+        chart_KDE->legend()->setFont(chartFont_kde);
+        chartAndNugget_kde->addWidget(chartView_KDE,0,0);
+        tabWidgetScatter->addTab(container_kde,QString("KDE"));
+        auto markerlist_kde = chart_KDE->legend()->markers();
+        markerlist_kde[1]->setVisible(false);
     }
-    // set axis
-    inteval = maxy - miny;
-    maxy = maxy + inteval*0.1;
-    l_cutoff_kde->append(maxx, yKDE[kdeComp-2].toDouble());
-    QValueAxis *axisX_kde = new QValueAxis();
-    QLogValueAxis *axisY_kde = new QLogValueAxis();
-    axisX_kde->setLabelFormat("%.0f");
-    axisY_kde->setLabelFormat("%.6f");
-    axisX_kde->setTitleText(QString("Number of Component"));
-    axisY_kde->setTitleText(QString("Diff. Maps Eigenvalue"));
-    axisX_kde->setRange(minx, maxx);
-    axisY_kde->setRange(miny, maxy);
-    chart_KDE->addSeries(series_KDE);
-    chart_KDE->addSeries(l_KDE);
-    series_KDE->setName("Diff. Maps Eigenvalue");
-    chart_KDE->addSeries(l_cutoff_kde);
-    l_cutoff_kde->setName("Mininum eigen considered");
-    chart_KDE->setAxisX(axisX_kde, series_KDE);
-    chart_KDE->setAxisY(axisY_kde, series_KDE);
-    chart_KDE->setAxisX(axisX_kde, l_KDE);
-    chart_KDE->setAxisY(axisY_kde, l_KDE);
-    chart_KDE->setAxisX(axisX_kde, l_cutoff_kde);
-    chart_KDE->setAxisY(axisY_kde, l_cutoff_kde);
-    // set fontsize
-    QFont chartFont_kde;
-    chartFont_kde.setPixelSize(12);
-    chart_PCA->setFont(chartFont_kde);
-    axisX->setLabelsFont(chartFont_kde);
-    axisY->setLabelsFont(chartFont_kde);
-    axisX->setTitleFont(chartFont_kde);
-    axisY->setTitleFont(chartFont_kde);
-    chart_KDE->legend()->setFont(chartFont_kde);
-    chartAndNugget_kde->addWidget(chartView_KDE,0,0);
-    tabWidgetScatter->addTab(container_kde,QString("KDE"));
-    auto markerlist_kde = chart_KDE->legend()->markers();
-    markerlist_kde[1]->setVisible(false);
-
 
     tabWidgetScatter->setMinimumWidth(500);
     tabWidgetScatter->setMinimumHeight(500);

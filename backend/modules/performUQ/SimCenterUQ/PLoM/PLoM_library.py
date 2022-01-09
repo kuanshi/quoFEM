@@ -100,7 +100,7 @@ def g(K, b):
     g = np.multiply(g, sqrt_norm)
     return g, eigenvalues
 
-def m(eigenvalues):
+def m(eigenvalues, tol=0.1):
     """
     >>> m(np.array([1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.025]))
     11
@@ -108,7 +108,7 @@ def m(eigenvalues):
     i = 2
     m = 0
     while i < len(eigenvalues) and m == 0:
-        if eigenvalues[i] <= eigenvalues[1]*0.1:
+        if eigenvalues[i] <= eigenvalues[1]*tol:
             return i+1
         i = i+1
     if m == 0:
@@ -153,10 +153,10 @@ def PCA(x, tol):
     x_mean = mean(x)
     (phi,mu,v) = np.linalg.svd(x-x_mean)
     mu = mu/sqrt(len(x[0])-1)
-    plt.figure()
-    plt.plot(np.arange(len(mu)), mu)
-    plt.xlabel('# eigenvalue of X covariance')
-    plt.show()
+    #plt.figure()
+    #plt.plot(np.arange(len(mu)), mu)
+    #plt.xlabel('# eigenvalue of X covariance')
+    #plt.show()
     error = 1
     i = 0
     errors = [1]
@@ -169,16 +169,16 @@ def PCA(x, tol):
         error = error -  (mu[i]**2)/sum((mu**2))
         i = i+1
         errors.append(error)
-    plt.figure()
-    plt.semilogy(np.arange(len(mu)+1), errors)
-    plt.xlabel('# eigenvalue of Covariance matrix of X')
-    plt.ylabel('Error of the PCA associated with the eigenvalue')
-    plt.show()
+    #plt.figure()
+    #plt.semilogy(np.arange(len(mu)+1), errors)
+    #plt.xlabel('# eigenvalue of Covariance matrix of X')
+    #plt.ylabel('Error of the PCA associated with the eigenvalue')
+    #plt.show()
     mu = mu[0:nu]
     phi = phi[:,0:nu]
     mu_sqrt_inv = (np.diag(1/(mu))) #no need to do the sqrt because we use the singularvalues
     eta = mu_sqrt_inv.dot(np.transpose(phi)).dot((x-x_mean))
-    return eta, mu, phi #mu is the diagonal matrix with the singularvalues up to a tolerance
+    return eta, mu, phi, errors #mu is the diagonal matrix with the singularvalues up to a tolerance
 
 def parameters_kde(eta):
     """

@@ -16,9 +16,9 @@ import sys
 from general import *
 
 class PLoM:
-    def __init__(self, model_name='plom', data='', separator=',', col_header=False, constraints = None, run_tag = False, plot_tag = False, num_rlz = 5, tol_pca = 1e-6, epsilon_kde = 25, tol_PCA2 = 1e-5, tol = 1e-6, max_iter = 50, runDiffMaps = True):
+    def __init__(self, model_name='plom', data='', separator=',', col_header=False, constraints = None, run_tag = False, plot_tag = False, num_rlz = 5, tol_pca = 1e-6, epsilon_kde = 25, tol_PCA2 = 1e-5, tol = 1e-6, max_iter = 50, runDiffMaps = True, db_path=None):
         # basic setups
-        self._basic_config(model_name=model_name)
+        self._basic_config(model_name=model_name, db_path=db_path)
         self.plot_tag = plot_tag
         # initialize constraints
         self.constraints = {}
@@ -50,14 +50,17 @@ class PLoM:
             self.logfile.write_msg(msg='PLoM: using RunAlgorithm(n_mc=n_mc,epsilon_pca=epsilon_pca,epsilon_kde) to run simulations.',msg_type='RUNNING',msg_level=0)
 
         
-    def _basic_config(self, model_name=None):
+    def _basic_config(self, model_name=None, db_path=None):
         """
         Basic setups
         - model_name: job name (used for database name)
         """
-        # initialize log and running directories
-        self.dir_log = os.path.join(os.path.dirname(os.path.abspath(__file__)),'RunDir')
-        self.dir_run = os.path.join(os.path.dirname(os.path.abspath(__file__)),'RunDir',model_name)
+        if not db_path:
+            self.dir_log = os.path.join(os.path.dirname(os.path.abspath(__file__)),'RunDir')
+            self.dir_run = os.path.join(os.path.dirname(os.path.abspath(__file__)),'RunDir',model_name)
+        else:
+            self.dir_log = db_path
+            self.dir_run = os.path.join(db_path, model_name)
         # initialize logfile
         try:
             os.makedirs(self.dir_run, exist_ok=True)
@@ -67,6 +70,7 @@ class PLoM:
             self.logfile.write_msg(msg='PLoM: Running directory {} cannot be initialized.'.format(self.dir_run),msg_type='ERROR',msg_level=0)
         # initialize database server
         self.dbserver = None
+        self.dbserver = DBServer(db_dir = self.dir_run, db_name=model_name+'.h5')
         try:
             self.dbserver = DBServer(db_dir = self.dir_run, db_name=model_name+'.h5')
         except:
@@ -436,7 +440,7 @@ class PLoM:
             self.logfile.write_msg(msg='PLoM.config_tasks: the following tasks is configured to run: {}.'.format('->'.join(self.cur_task_list)),msg_type='RUNNING',msg_level=0)
         
 
-    def RunAlgorithm(self, n_mc = 5, epsilon_pca = 1e-6, epsilon_kde = 25, tol_PCA2 = 1e-5, tol = 1e-6, max_iter = 50, plot_tag = False, runDiffMaps = None, seed_num=None):
+    def RunAlgorithm(self, n_mc = 5, epsilon_pca = 1e-6, epsilon_kde = 25, tol_PCA2 = 1e-5, tol = 1e-6, max_iter = 50, plot_tag = False, runDiffMaps = None, seed_num=None, tolKDE=0.1):
         """
         Running the PLoM algorithm to train the model and generate new realizations
         - n_mc: realization/sample size ratio
@@ -467,12 +471,13 @@ class PLoM:
             elif cur_task.task_name == 'RunPCA':
                 self.__getattribute__('task_'+cur_task.task_name).avail_var_list = []
                 #PCA
-                self.H, self.mu, self.phi, self.nu = self.RunPCA(self.X_scaled, epsilon_pca)
+                self.H, self.mu, self.phi, self.nu, self.errPCA = self.RunPCA(self.X_scaled, epsilon_pca)
                 self.logfile.write_msg(msg='PLoM.RunAlgorithm: PCA completed.',msg_type='RUNNING',msg_level=0)
                 self.dbserver.add_item(item_name = 'X_PCA', col_names = ['Component'+str(i+1) for i in range(self.H.shape[0])], item = self.H.T, data_shape=self.H.shape)
                 self.dbserver.add_item(item_name = 'EigenValue_PCA', item = self.mu, data_shape=self.mu.shape)
                 self.dbserver.add_item(item_name = 'EigenVector_PCA', col_names = ['V'+str(i+1) for i in range(self.phi.shape[1])], item = self.phi, data_shape=self.phi.shape)
                 self.dbserver.add_item(item_name = 'NumComp_PCA', item = np.array([self.nu]))
+                self.dbserver.add_item(item_name = 'Error_PCA', item = np.array(self.errPCA))
                 self.logfile.write_msg(msg='PLoM.RunAlgorithm: X_PCA, EigenValue_PCA and EigenVector_PCA saved.',msg_type='RUNNING',msg_level=0)
             elif cur_task.task_name == 'RunKDE':
                 self.__getattribute__('task_'+cur_task.task_name).avail_var_list = []
@@ -489,24 +494,27 @@ class PLoM:
                 if runDiffMaps:
                     self.__getattribute__('task_'+cur_task.task_name).avail_var_list = []
                     #diff maps
-                    self.g, self.m, self.a, self.Z = self.DiffMaps(self.H, self.K, self.b)
+                    self.g, self.m, self.a, self.Z, self.eigenKDE = self.DiffMaps(self.H, self.K, self.b, tol=tolKDE)
                     self.logfile.write_msg(msg='PLoM.RunAlgorithm: diffusion maps completed.',msg_type='RUNNING',msg_level=0)
                     self.dbserver.add_item(item_name = 'KDE_g', item = self.g, data_shape=self.g.shape)
                     self.dbserver.add_item(item_name = 'KDE_m', item = np.array([self.m]))
                     self.dbserver.add_item(item_name = 'KDE_a', item = self.a, data_shape=self.a.shape)
                     self.dbserver.add_item(item_name = 'KDE_Z', item = self.Z, data_shape=self.Z.shape)
-                    self.logfile.write_msg(msg='PLoM.RunAlgorithm: KDE_g, KDE_m, KDE_a and KDE_Z saved.',msg_type='RUNNING',msg_level=0)
+                    self.dbserver.add_item(item_name = 'KDE_Eigen', item = self.eigenKDE, data_shape=self.eigenKDE.shape)
+                    self.logfile.write_msg(msg='PLoM.RunAlgorithm: KDE_g, KDE_m, KDE_a, KDE_Z, and KDE_Eigen saved.',msg_type='RUNNING',msg_level=0)
                 else:
                     self.g = np.identity(self.N)
                     self.m = self.N
                     self.a = self.g[:,:self.m].dot(np.linalg.inv(np.transpose(self.g[:,:self.m]).dot(self.g[:,:self.m])))
                     self.Z = self.H.dot(self.a)
+                    self.eigenKDE = np.array([])
                     self.logfile.write_msg(msg='PLoM.RunAlgorithm: diffusion map is inactivated.',msg_type='RUNNING',msg_level=0)
                     self.dbserver.add_item(item_name = 'KDE_g', item = self.g, data_shape=self.g.shape)
                     self.dbserver.add_item(item_name = 'KDE_m', item = np.array([self.m]))
                     self.dbserver.add_item(item_name = 'KDE_a', item = self.a, data_shape=self.a.shape)
                     self.dbserver.add_item(item_name = 'KDE_Z', item = self.Z, data_shape=self.Z.shape)
-                    self.logfile.write_msg(msg='PLoM.RunAlgorithm: KDE_g, KDE_m, KDE_a and KDE_Z saved.',msg_type='RUNNING',msg_level=0)
+                    self.dbserver.add_item(item_name = 'KDE_Eigen', item = self.eigenKDE, data_shape=self.eigenKDE.shape)
+                    self.logfile.write_msg(msg='PLoM.RunAlgorithm: KDE_g, KDE_m, KDE_a, KDE_Z, and KDE_Eigen saved.',msg_type='RUNNING',msg_level=0)
             elif cur_task.task_name == 'ISDEGeneration':
                 self.__getattribute__('task_'+cur_task.task_name).avail_var_list = []
                 #ISDE generation
@@ -547,7 +555,7 @@ class PLoM:
 
     def RunPCA(self, X_origin, epsilon_pca):
         #...PCA...
-        (H, mu, phi) = plom.PCA(X_origin, epsilon_pca)
+        (H, mu, phi, errors) = plom.PCA(X_origin, epsilon_pca)
         nu = len(H)
         self.logfile.write_msg(msg='PLoM.RunPCA: considered number of PCA components = {}'.format(nu),msg_type='RUNNING',msg_level=0)
         if self.plot_tag:
@@ -561,7 +569,7 @@ class PLoM:
             cbar = fig.colorbar(ctp)
             plt.savefig(os.path.join(self.vl_path,'PCA_CovarianceMatrix.png'),dpi=480)
             self.logfile.write_msg(msg='PLoM: {} saved in {}.'.format('PCA_CovarianceMatrix.png',self.vl_path),msg_type='RUNNING',msg_level=0)
-        return H, mu, phi, nu
+        return H, mu, phi, nu, errors
 
 
     def RunKDE(self, X, epsilon_kde):
@@ -576,13 +584,13 @@ class PLoM:
         return s_v, c_v, hat_s_v, K, b 
 
 
-    def DiffMaps(self, H, K, b):
+    def DiffMaps(self, H, K, b, tol=0.1):
         #..diff maps basis...
         #self.Z = PCA(self.H)
         try:
             g, eigenvalues = plom.g(K, b) #diffusion maps
             g = g.real
-            m = plom.m(eigenvalues)
+            m = plom.m(eigenvalues, tol=tol)
             a = g[:,0:m].dot(np.linalg.inv(np.transpose(g[:,0:m]).dot(g[:,0:m])))
             Z = H.dot(a)
             if self.plot_tag:
@@ -598,9 +606,10 @@ class PLoM:
             m = 0
             a = None
             Z = None
+            eigenvalues = []
             self.logfile.write_msg(msg='PLoM.DiffMaps: diffusion maps failed.',msg_type='ERROR',msg_level=0)
 
-        return g, m, a, Z
+        return g, m, a, Z, eigenvalues
 
 
     def ISDEGeneration(self, n_mc = 5, tol_PCA2 = 1e-5, tol = 0.02, max_iter = 50, seed_num=None):
@@ -629,7 +638,7 @@ class PLoM:
 
             self.errors = [plom.err(self.gradient, self.b_c)]
             iteration = 0
-            nu_init = np.random.normal(size=(self.nu,self.N))
+            nu_init = np.random.normal(size=(int(self.nu),int(self.N)))
             self.Y = nu_init.dot(self.a)
 
             error_ratio = 0
@@ -640,7 +649,7 @@ class PLoM:
                 Hnewvalues, nu_lambda, x_, x_2 = plom.generator(self.Z, self.Y, self.a,\
                                             n_mc, self.x_mean, self.H, self.s_v,\
                                             self.hat_s_v, self.mu, self.phi,\
-                                            self.g[:,0:self.m],  psi=self.psi,\
+                                            self.g[:,0:int(self.m)],  psi=self.psi,\
                                             lambda_i=self.lambda_i, g_c=self.g_c, D_x_g_c = self.D_x_g_c) #solve the ISDE in n_mc iterations
 
                 self.gradient = plom.gradient_gamma(self.b_c, Hnewvalues, self.g_c, self.phi, self.mu, self.psi, self.x_mean)
@@ -668,14 +677,18 @@ class PLoM:
 
         #no constraints
         else:
-            nu_init = np.random.normal(size=(self.nu,self.N))
+            nu_init = np.random.normal(size=(int(self.nu),int(self.N)))
             self.Y = nu_init.dot(self.a)
             Hnewvalues, nu_lambda, x_, x_2 = plom.generator(self.Z, self.Y, self.a,\
                                         n_mc, self.x_mean, self.H, self.s_v,\
                                         self.hat_s_v, self.mu, self.phi,\
-                                        self.g[:,0:self.m],seed_num=seed_num) #solve the ISDE in n_mc iterations
+                                        self.g[:,0:int(self.m)],seed_num=seed_num) #solve the ISDE in n_mc iterations
             self.logfile.write_msg(msg='PLoM.ISDEGeneration: new generations are simulated.',msg_type='RUNNING',msg_level=0)
             self.dbserver.add_item(item_name = 'Errors', item = np.array([0]))
+
+            #saving data
+            self.errors = []
+            self.dbserver.add_item(item_name = 'Errors', item = np.array(self.errors), data_shape=np.array(self.errors).shape)
 
         self.Xnew = self.x_mean + self.phi.dot(np.diag(self.mu)).dot(Hnewvalues)
         
