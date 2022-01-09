@@ -70,6 +70,10 @@ class runPLoM:
     runPLoM: class for run a PLoM job
     methods:
         __init__: initialization
+        _create_variables: create variable name lists
+        _parse_plom_parameters: parse PLoM modeling parameters
+        _set_up_parallel: set up paralleling configurations
+        _load_variables: load training data
         train_model: model training
         save_model: model saving
     """
@@ -253,54 +257,52 @@ class runPLoM:
             if do_sampling:
                 pass
             else:
-                if not self.preTrained:
-                    X = read_file(self.inpData, self.errlog)
-                    if len(X.columns) != self.x_dim:
-                        msg = 'Error importing input data: Number of dimension inconsistent: have {} RV(s) but {} column(s).' \
-                            .format(self.x_dim, len(X.columns))
-                        errlog.exit(msg)
-                    if self.logTransform:
-                        X = np.log(X)
+                X = read_txt(self.inpData, self.errlog)
+                if len(X.columns) != self.x_dim:
+                    msg = 'Error importing input data: Number of dimension inconsistent: have {} RV(s) but {} column(s).' \
+                        .format(self.x_dim, len(X.columns))
+                    errlog.exit(msg)
+                if self.logTransform:
+                    X = np.log(X)
 
             if do_simulation:
                 pass
             else:
-                if not self.preTrained:
-                    Y = read_file(self.outData, self.errlog)
-                    if Y.shape[1] != self.y_dim:
-                        msg = 'Error importing input data: Number of dimension inconsistent: have {} QoI(s) but {} column(s).' \
-                            .format(self.y_dim, len(Y.columns))
-                        errlog.exit(msg)
-                    if self.logTransform:
-                        Y = np.log(Y)
+                Y = read_txt(self.outData, self.errlog)
+                if Y.shape[1] != self.y_dim:
+                    msg = 'Error importing input data: Number of dimension inconsistent: have {} QoI(s) but {} column(s).' \
+                        .format(self.y_dim, len(Y.columns))
+                    errlog.exit(msg)
+                if self.logTransform:
+                    Y = np.log(Y)
 
-                    if X.shape[0] != Y.shape[0]:
-                        msg = 'Error importing input data: numbers of samples of inputs ({}) and outputs ({}) are inconsistent'.format(len(X.columns), len(Y.columns))
-                        errlog.exit(msg)
+                if X.shape[0] != Y.shape[0]:
+                    msg = 'Error importing input data: numbers of samples of inputs ({}) and outputs ({}) are inconsistent'.format(len(X.columns), len(Y.columns))
+                    errlog.exit(msg)
 
-                    n_samp = Y.shape[0]
-                    # writing a data file for PLoM input
-                    self.X = X.to_numpy()
-                    self.Y = Y.to_numpy()
-                    inputXY = os.path.join(work_dir, "templatedir/inputXY.csv")
-                    X_Y = pd.concat([X,Y], axis=1)
-                    X_Y.to_csv(inputXY, sep=',', header=True, index=False)
-                    self.inputXY = inputXY
-                    self.n_samp = n_samp
+                n_samp = Y.shape[0]
+                # writing a data file for PLoM input
+                self.X = X.to_numpy()
+                self.Y = Y.to_numpy()
+                inputXY = os.path.join(work_dir, "templatedir/inputXY.csv")
+                X_Y = pd.concat([X,Y], axis=1)
+                X_Y.to_csv(inputXY, sep=',', header=True, index=False)
+                self.inputXY = inputXY
+                self.n_samp = n_samp
 
-                    self.do_sampling = do_sampling
-                    self.do_simulation = do_simulation
-                    self.rvName = []
-                    self.rvDist = []
-                    self.rvVal = []
-                    for nx in range(self.x_dim):
-                        rvInfo = job_config["randomVariables"][nx]
-                        self.rvName = self.rvName + [rvInfo["name"]]
-                        self.rvDist = self.rvDist + [rvInfo["distribution"]]
-                        if do_sampling:
-                            self.rvVal = self.rvVal + [(rvInfo["upperbound"] + rvInfo["lowerbound"]) / 2]
-                        else:
-                            self.rvVal = self.rvVal + [np.mean(self.X[:, nx])]
+                self.do_sampling = do_sampling
+                self.do_simulation = do_simulation
+                self.rvName = []
+                self.rvDist = []
+                self.rvVal = []
+                for nx in range(self.x_dim):
+                    rvInfo = job_config["randomVariables"][nx]
+                    self.rvName = self.rvName + [rvInfo["name"]]
+                    self.rvDist = self.rvDist + [rvInfo["distribution"]]
+                    if do_sampling:
+                        self.rvVal = self.rvVal + [(rvInfo["upperbound"] + rvInfo["lowerbound"]) / 2]
+                    else:
+                        self.rvVal = self.rvVal + [np.mean(self.X[:, nx])]
         except:
             run_flag = 1
 
@@ -333,14 +335,17 @@ class runPLoM:
         self.pcaComp = self.modelPLoM.nu
         self.kdeEigen = self.modelPLoM.eigenKDE
         self.kdeComp = self.modelPLoM.m
-        self.Errors = self.modelPLoM.errors
+        self.Errors = []
+        if self.constraintsFlag:
+            self.Errors = self.modelPLoM.errors
 
 
     def save_model(self):
 
         # copy the h5 model file to the main work dir
         shutil.copy2(os.path.join(self.work_dir,'templatedir','SurrogatePLoM','SurrogatePLoM.h5'),self.work_dir)
-        shutil.copy2(os.path.join(self.work_dir,'templatedir','SurrogatePLoM','DataOut','X_new.csv'),self.work_dir)
+        if self.n_mc > 0:
+            shutil.copy2(os.path.join(self.work_dir,'templatedir','SurrogatePLoM','DataOut','X_new.csv'),self.work_dir)
 
         header_string_x = ' ' + ' '.join([str(elem) for elem in self.rv_name]) + ' '
         header_string_y = ' ' + ' '.join([str(elem) for elem in self.g_name])
@@ -348,9 +353,8 @@ class runPLoM:
 
         #xy_data = np.concatenate((np.asmatrix(np.arange(1, self.n_samp + 1)).T, self.X, self.Y), axis=1)
         #np.savetxt(self.work_dir + '/dakotaTab.out', xy_data, header=header_string, fmt='%1.4e', comments='%')
-        if not self.preTrained:
-            np.savetxt(self.work_dir + '/inputTab.out', self.X, header=header_string_x, fmt='%1.4e', comments='%')
-            np.savetxt(self.work_dir + '/outputTab.out', self.Y, header=header_string_y, fmt='%1.4e', comments='%')
+        np.savetxt(self.work_dir + '/inputTab.out', self.X, header=header_string_x, fmt='%1.4e', comments='%')
+        np.savetxt(self.work_dir + '/outputTab.out', self.Y, header=header_string_y, fmt='%1.4e', comments='%')
 
         results = {}
 
@@ -391,16 +395,17 @@ class runPLoM:
         results["kdeComp"] = self.kdeComp
         results["Errors"] = self.Errors
         
-        Xnew = pd.read_csv(self.work_dir + '/X_new.csv', header=0, index_col=0)
-        if self.logTransform:
-            Xnew = np.exp(Xnew)
-        for nx in range(self.x_dim):
-            results["xPredict"][self.rv_name[nx]] = Xnew.iloc[:, nx].tolist()
+        if self.n_mc > 0:
+            Xnew = pd.read_csv(self.work_dir + '/X_new.csv', header=0, index_col=0)
+            if self.logTransform:
+                Xnew = np.exp(Xnew)
+            for nx in range(self.x_dim):
+                results["xPredict"][self.rv_name[nx]] = Xnew.iloc[:, nx].tolist()
 
-        for ny in range(self.y_dim):
-            results["yPredict"][self.g_name[ny]] = Xnew.iloc[:, self.x_dim+ny].tolist()
+            for ny in range(self.y_dim):
+                results["yPredict"][self.g_name[ny]] = Xnew.iloc[:, self.x_dim+ny].tolist()
 
-        xy_data = np.concatenate((np.asmatrix(np.arange(1, len(Xnew.index)+1)).T, Xnew.to_numpy()), axis=1)
+        xy_data = np.concatenate((np.asmatrix(np.arange(1, self.X.shape[0] + 1)).T, self.X, self.Y), axis=1)
         np.savetxt(self.work_dir + '/dakotaTab.out', xy_data, header=header_string, fmt='%1.4e', comments='%')
 
             #if not self.do_logtransform:
@@ -416,46 +421,41 @@ class runPLoM:
             json.dump(results, fp, indent=2)
 
         print("Results Saved")
-"""
-def read_file(text_dir, errlog):
+
+
+def read_txt(text_dir, errlog):
+
     if not os.path.exists(text_dir):
         msg = "Error: file does not exist: " + text_dir
         errlog.exit(msg)
-    
-    sep_options = [',', '\s+']
-    for cur_sep in sep_options:
+
+    with open(text_dir) as f:
+        # Iterate through the file until the table starts
+        header_count = 0
+        for line in f:
+            if line.startswith('%'):
+                header_count = header_count + 1
+                print(line)
         try:
-            tmp_data = pd.read_csv(text_dir, sep=cur_sep, header=0)
-        except:
-            tmp_data = None
-        if tmp_data:
-            break
+            with open(text_dir) as f:
+                X = np.loadtxt(f, skiprows=header_count)
+        except ValueError:
+            with open(text_dir) as f:
+                try:
+                    X = np.genfromtxt(f, skip_header=header_count, delimiter=',')
+                    # if there are extra delimiter, remove nan
+                    if np.isnan(X[-1, -1]):
+                        X = np.delete(X, -1, 1)
+                except ValueError:
+                    msg = "Error: file format is not supported " + text_dir
+                    errlog.exit(msg)
 
-    if not tmp_data:
-        msg = "Error: file is not supported " + text_dir
-        errlog.exit(msg)
-        X = None
-    else:
-        X = tmp_data  
+    if X.ndim == 1:
+        X = np.array([X]).transpose()
 
-    return X
-"""
+    df_X = pd.DataFrame(data=X, columns=["V"+str(x) for x in range(X.shape[1])])
 
-def read_file(text_dir, errlog):
-    if not os.path.exists(text_dir):
-        msg = "Error: file does not exist: " + text_dir
-        errlog.exit(msg)
-    
-    sep_options = [',', '\\t']
-    for cur_sep in sep_options:
-        try:
-            X = pd.read_csv(text_dir, sep=cur_sep, skiprows=0)
-        except:
-            msg = "Error: file is not supported " + text_dir
-            errlog.exit(msg)
-            X = None 
-
-    return X
+    return df_X
     
 
 class errorLog(object):

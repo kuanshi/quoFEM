@@ -58,6 +58,8 @@ UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 #include <QButtonGroup>
 #include <QRadioButton>
 #include <QStackedWidget>
+#include <QJsonDocument>
+#include <QJsonArray>
 
 PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *femwidget,InputWidgetEDP *edpwidget, QWidget *parent)
 : UQ_MethodInputWidget(parent), theParameters(param), theEdpWidget(edpwidget), theFemWidget(femwidget)
@@ -134,8 +136,8 @@ PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *fe
     inpFileDir2 = new QLineEdit();
     QPushButton *chooseInpFile2 = new QPushButton("Choose");
     connect(chooseInpFile2, &QPushButton::clicked, this, [=](){
-        inpFileDir2->setText(QFileDialog::getOpenFileName(this,tr("Open File"),"", "All files (*.*)"));
-        this->parseInputDataForRV(inpFileDir2->text());
+        inpFileDir2->setText(QFileDialog::getOpenFileName(this,tr("Open File"),"", "h5 files (*.h5)"));
+        this->parsePretrainedModelForRVQoI(inpFileDir2->text());
     });
     inpFileDir2->setMinimumWidth(200);
     inpFileDir2->setReadOnly(true);
@@ -500,6 +502,99 @@ int PLoMInputWidget::parseOutputDataForQoI(QString name1){
     return 0;
 }
 
+int PLoMInputWidget::parsePretrainedModelForRVQoI(QString name1){
+
+    // five tasks here:
+    // 1. parse the JSON file of the pretrained model
+    // 2. create RV
+    // 3. create QoI
+    // 4. check inpData file, inpFile.in
+    // 5. check outFile file, outFile.in
+
+    // look for the JSON file in the model directory
+    QString fileName = name1;
+    fileName.replace(".h5",".json");
+    QFile jsonFile(fileName);
+    if (!jsonFile.open(QFile::ReadOnly | QFile::Text)) {
+        QString message = QString("Error: could not open file") + fileName;
+        this->errorMessage(message);
+        return 1;
+    }
+    // place contents of file into json object
+    QString val;
+    val=jsonFile.readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(val.toUtf8());
+    QJsonObject jsonObject = doc.object();
+    // close file
+    jsonFile.close();
+    // check file contains valid object
+    if (jsonObject.isEmpty()) {
+        this->errorMessage("ERROR: file either empty or malformed JSON "+fileName);
+        return 1;
+    }
+    this->statusMessage("Pretrained model JSON file loaded.");
+
+    // create RV
+    QJsonArray xLabels;
+    if (jsonObject.contains("xlabels")) {
+        xLabels = jsonObject["xlabels"].toArray();
+    } else {
+        this->errorMessage("ERROR: xlables are missing in "+fileName);
+        return 1;
+    }
+    int numberOfColumns = xLabels.size();
+    QStringList varNamesAndValues;
+    for (int i=0;i<numberOfColumns;i++) {
+        varNamesAndValues.append(xLabels[i].toString());
+        varNamesAndValues.append("nan");
+    }
+    theParameters->setGPVarNamesAndValues(varNamesAndValues);
+    numSamples=0;
+    this->statusMessage("RV created.");
+
+    // create QoI
+    QJsonArray yLabels;
+    if (jsonObject.contains("ylabels")) {
+        yLabels = jsonObject["ylabels"].toArray();
+    } else {
+        this->errorMessage("ERROR: ylables are missing in "+fileName);
+        return 1;
+    }
+    numberOfColumns = yLabels.size();
+    QStringList qoiNames;
+    for (int i=0;i<numberOfColumns;i++) {
+        qoiNames.append(yLabels[i].toString());
+    }
+    theEdpWidget->setGPQoINames(qoiNames);
+    this->statusMessage("QoI created.");
+
+    // check inpFile
+    QFileInfo fileInfo(fileName);
+    QString path = fileInfo.absolutePath();
+    QFile inpFile(path+QDir::separator()+"inpFile.in");
+    if (!inpFile.open(QFile::ReadOnly | QFile::Text)) {
+        QString message = QString("Error: could not open file") + inpFile.fileName();
+        this->errorMessage(message);
+        return 1;
+    }
+    inpFile.close();
+    inpFileDir->setText(inpFile.fileName());
+
+    // check outFile
+    QFile outFile(path+QDir::separator()+"outFile.in");
+    if (!outFile.open(QFile::ReadOnly | QFile::Text)) {
+        QString message = QString("Error: could not open file") + outFile.fileName();
+        this->errorMessage(message);
+        return 1;
+    }
+    outFile.close();
+    outFileDir->setText(outFile.fileName());
+    this->statusMessage("Input data loaded.");
+
+    // return
+    return 0;
+}
+
 int PLoMInputWidget::countColumn(QString name1){
     // get number of columns
     std::ifstream inFile(name1.toStdString());
@@ -628,6 +723,8 @@ PLoMInputWidget::copyFiles(QString &fileDir) {
         qDebug() << inpFileDir2->text().replace(".h5",".json");
         qDebug() << fileDir + QDir::separator() + "surrogatePLoM.json";
         QFile::copy(inpFileDir2->text().replace(".h5",".json"), fileDir + QDir::separator() + "surrogatePLoM.json");
+        QFile::copy(inpFileDir->text(), fileDir + QDir::separator() + "inpFile.in");
+        QFile::copy(outFileDir->text(), fileDir + QDir::separator() + "outFile.in");
     } else {
         QFile::copy(inpFileDir->text(), fileDir + QDir::separator() + "inpFile.in");
         QFile::copy(outFileDir->text(), fileDir + QDir::separator() + "outFile.in");

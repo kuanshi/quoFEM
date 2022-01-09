@@ -340,6 +340,12 @@ SimCenterUQResultsPLoM::onSaveModelClicked()
 
     lastPath =  QFileInfo(fileName).path();
 
+    // saving training data
+    QFile::copy(workingDir+QString("inputTab.out"), path+QDir::separator()+"inpFile.in");
+    QFile::copy(workingDir+QString("outputTab.out"), path+QDir::separator()+"outFile.in");
+
+    this->statusMessage("PLoM model and data saved in "+path);
+
 }
 
 void
@@ -550,9 +556,9 @@ void SimCenterUQResultsPLoM::summarySurrogate(QScrollArea *&sa)
     bool isMultiFidelity = jsonObj["doMultiFidelity"].toBool();
     QJsonArray pcaEigen = jsonObj["pcaEigen"].toArray();
     QJsonArray pcaError = jsonObj["pcaError"].toArray();
-    QJsonArray pcaComp = jsonObj["pcaComp"].toArray();
+    int pcaComp = jsonObj["pcaComp"].toInt();
     QJsonArray kdeEigen = jsonObj["kdeEigen"].toArray();
-    QJsonArray kdeComp = jsonObj["kdeComp"].toArray();
+    int kdeComp = jsonObj["kdeComp"].toInt();
     int newSampleRatio = jsonObj["newSampleRatio"].toInt();
     QJsonArray Errors = jsonObj["Errors"].toArray();
 
@@ -905,7 +911,7 @@ void SimCenterUQResultsPLoM::summarySurrogate(QScrollArea *&sa)
             miny = std::min(miny,yPr[i].toDouble());
             l_PCA->append(yEx[i].toDouble(), yPr[i].toDouble());
         }
-        if (i == (pcaComp[0].toInt()-1)) {
+        if (i == (pcaComp-1)) {
             l_cutoff->append(yEx[i].toDouble(), 0);
             l_cutoff->append(yEx[i].toDouble(), yPr[i].toDouble());
         }
@@ -914,7 +920,7 @@ void SimCenterUQResultsPLoM::summarySurrogate(QScrollArea *&sa)
     double inteval = maxy - miny;
     miny = miny - inteval*0.1;
     maxy = maxy + inteval*0.1;
-    l_cutoff->append(yEx[pcaComp[0].toInt()-1].toDouble(), maxy);
+    l_cutoff->append(yEx[pcaComp-1].toDouble(), maxy);
     QValueAxis *axisX = new QValueAxis();
     QValueAxis *axisY = new QValueAxis();
     axisX->setLabelFormat("%.4f");
@@ -986,18 +992,18 @@ void SimCenterUQResultsPLoM::summarySurrogate(QScrollArea *&sa)
             miny = std::min(miny,yKDE[i].toDouble());
             l_KDE->append(i+1, yKDE[i].toDouble());
         }
-        if (i == (kdeComp[0].toInt()-2)) {
+        if (i == (kdeComp-2)) {
             l_cutoff_kde->append(0, yKDE[i].toDouble());
             l_cutoff_kde->append(i+1, yKDE[i].toDouble());
         }
-        if (yKDE[i].toDouble() < 0.01*yKDE[kdeComp[0].toInt()-2].toDouble()) {
+        if (yKDE[i].toDouble() < 0.01*yKDE[kdeComp-2].toDouble()) {
             break;
         }
     }
     // set axis
     inteval = maxy - miny;
     maxy = maxy + inteval*0.1;
-    l_cutoff_kde->append(maxx, yKDE[kdeComp[0].toInt()-2].toDouble());
+    l_cutoff_kde->append(maxx, yKDE[kdeComp-2].toDouble());
     QValueAxis *axisX_kde = new QValueAxis();
     QLogValueAxis *axisY_kde = new QLogValueAxis();
     axisX_kde->setLabelFormat("%.0f");

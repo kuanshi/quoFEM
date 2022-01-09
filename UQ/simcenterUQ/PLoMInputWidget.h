@@ -66,6 +66,7 @@ public:
     int getNumberTasks(void);
     int parseInputDataForRV(QString name1);
     int parseOutputDataForQoI(QString name1);
+    int parsePretrainedModelForRVQoI(QString name1);
     int numSamples;
     bool copyFiles(QString &fileDir);
 public slots:
