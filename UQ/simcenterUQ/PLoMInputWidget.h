@@ -51,6 +51,7 @@ class QStackedWidget;
 class InputWidgetParameters;
 class InputWidgetEDP;
 class InputWidgetFEM;
+class QComboBox;
 
 class PLoMInputWidget : public UQ_MethodInputWidget
 {
@@ -73,6 +74,7 @@ public slots:
     void setOutputDir(bool tog);
     void setConstraints(bool tog);
     void doAdvancedSetup(bool tog);
+    void setDiffMaps(bool tog);
 private:
     QLineEdit *ratioNewSamples;
     QLineEdit *epsilonPCA;
@@ -118,6 +120,13 @@ private:
     QStackedWidget* m_stackedWidgets;
     QWidget* rawDataGroup;
     QWidget* preTrainGroup;
+    QWidget* newSampleRatioWidget;
+
+    QComboBox *theAdvancedComboBox;
+    QWidget* advGeneralWidget;
+    QWidget* advKDEWidget;
+    QWidget* advConstraintsWidget;
+    QStackedWidget* adv_stackedWidgets;
 
     int countColumn(QString name1);
     bool preTrained;

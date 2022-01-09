@@ -1009,14 +1009,14 @@ void SimCenterUQResultsPLoM::summarySurrogate(QScrollArea *&sa)
     axisX_kde->setLabelFormat("%.0f");
     axisY_kde->setLabelFormat("%.6f");
     axisX_kde->setTitleText(QString("Number of Component"));
-    axisY_kde->setTitleText(QString("KDE Eigenvalue"));
+    axisY_kde->setTitleText(QString("Diff. Maps Eigenvalue"));
     axisX_kde->setRange(minx, maxx);
     axisY_kde->setRange(miny, maxy);
     chart_KDE->addSeries(series_KDE);
     chart_KDE->addSeries(l_KDE);
-    series_KDE->setName("KDE Eigenvalue");
+    series_KDE->setName("Diff. Maps Eigenvalue");
     chart_KDE->addSeries(l_cutoff_kde);
-    l_cutoff_kde->setName("Mininum eigen taken in KDE");
+    l_cutoff_kde->setName("Mininum eigen considered");
     chart_KDE->setAxisX(axisX_kde, series_KDE);
     chart_KDE->setAxisY(axisY_kde, series_KDE);
     chart_KDE->setAxisX(axisX_kde, l_KDE);

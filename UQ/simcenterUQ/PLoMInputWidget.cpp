@@ -60,6 +60,7 @@ UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 #include <QStackedWidget>
 #include <QJsonDocument>
 #include <QJsonArray>
+#include <QComboBox>
 
 PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *femwidget,InputWidgetEDP *edpwidget, QWidget *parent)
 : UQ_MethodInputWidget(parent), theParameters(param), theEdpWidget(edpwidget), theFemWidget(femwidget)
@@ -82,54 +83,37 @@ PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *fe
     typeLayout->addWidget(preTrainRadioButton);
     layout->addWidget(typeGroupBox,wid++,0);
 
+    // input data widget
     rawDataGroup = new QWidget(this);
     QGridLayout* rawDataLayout = new QGridLayout(rawDataGroup);
     rawDataGroup->setLayout(rawDataLayout);
     preTrainGroup = new QWidget(this);
     QGridLayout* preTrainLayout = new QGridLayout(preTrainGroup);
     preTrainGroup->setLayout(preTrainLayout);
-
-
-    //
     // Create Input LineEdit
-    //
-
     inpFileDir = new QLineEdit();
     QPushButton *chooseInpFile = new QPushButton("Choose");
     connect(chooseInpFile, &QPushButton::clicked, this, [=](){
         inpFileDir->setText(QFileDialog::getOpenFileName(this,tr("Open File"),"", "All files (*.*)"));
         this->parseInputDataForRV(inpFileDir->text());
     });
-    inpFileDir->setMinimumWidth(200);
     inpFileDir->setReadOnly(true);
-    //layout->addWidget(new QLabel("Training Data File: Input Variable"),wid,0);
-    //layout->addWidget(inpFileDir,wid,1,1,3);
-    //layout->addWidget(chooseInpFile,wid++,4);
     rawDataLayout->addWidget(new QLabel("Training Data File: Input"),0,0);
     rawDataLayout->addWidget(inpFileDir,0,1,1,3);
     rawDataLayout->addWidget(chooseInpFile,0,4);
-
-    //
     // Create Output LineEdit
-    //
     outFileDir = new QLineEdit();
     chooseOutFile = new QPushButton("Choose");
     connect(chooseOutFile, &QPushButton::clicked, this, [=](){
         outFileDir->setText(QFileDialog::getOpenFileName(this,tr("Open File"),"", "All files (*.*)"));
         this->parseOutputDataForQoI(outFileDir->text());
     });
-    outFileDir->setMinimumWidth(200);
     outFileDir->setReadOnly(true);
-    //layout->addWidget(new QLabel("Training Data File: Output Response"),wid,0,Qt::AlignTop);
-    //layout->addWidget(outFileDir,wid,1,1,3,Qt::AlignTop);
-    //layout->addWidget(chooseOutFile,wid,4,Qt::AlignTop);
     rawDataLayout->addWidget(new QLabel("Training Data File: Output"),1,0,Qt::AlignTop);
     rawDataLayout->addWidget(outFileDir,1,1,1,3,Qt::AlignTop);
     rawDataLayout->addWidget(chooseOutFile,1,4,Qt::AlignTop);
-
     errMSG=new QLabel("Unrecognized file format");
     errMSG->setStyleSheet({"color: red"});
-    //layout->addWidget(errMSG,wid++,1,Qt::AlignLeft);
     rawDataLayout->addWidget(errMSG,2,1,Qt::AlignLeft);
     errMSG->hide();
 
@@ -139,7 +123,6 @@ PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *fe
         inpFileDir2->setText(QFileDialog::getOpenFileName(this,tr("Open File"),"", "h5 files (*.h5)"));
         this->parsePretrainedModelForRVQoI(inpFileDir2->text());
     });
-    inpFileDir2->setMinimumWidth(200);
     inpFileDir2->setReadOnly(true);
     preTrainLayout->addWidget(new QLabel("Training Data File: Pretrained Model"),0,0);
     preTrainLayout->addWidget(inpFileDir2,0,1,1,3);
@@ -149,7 +132,6 @@ PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *fe
     m_stackedWidgets = new QStackedWidget(this);
     m_stackedWidgets->addWidget(rawDataGroup);
     m_stackedWidgets->addWidget(preTrainGroup);
-
     m_typeButtonsGroup->button(0)->setChecked(true);
     m_stackedWidgets->setCurrentIndex(0);
     connect(m_typeButtonsGroup, QOverload<int>::of(&QButtonGroup::buttonReleased), [this](int id)
@@ -165,133 +147,147 @@ PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *fe
             preTrained = true;
         }
     });
+
     layout->addWidget(m_stackedWidgets,wid++,0);
 
-    //
-    // create layout label and entry for # of new samples
-    //
-
+    // create widget for new sample ratio
+    newSampleRatioWidget = new QWidget();
+    QGridLayout* nsrLayout = new QGridLayout(newSampleRatioWidget);
+    newSampleRatioWidget->setLayout(nsrLayout);
     ratioNewSamples = new QLineEdit();
     ratioNewSamples->setText(tr("5"));
     ratioNewSamples->setValidator(new QIntValidator);
     ratioNewSamples->setToolTip("The ratio between the number of new realizations and the size of original sample. \nIf \"0\" is given, the PLoM model is trained without new predictions");
     ratioNewSamples->setMaximumWidth(150);
-
     QLabel *newSNR = new QLabel("New Sample Number Ratio");
-    layout->addWidget(newSNR, wid, 0);
-    layout->addWidget(ratioNewSamples, wid++, 1);
+    nsrLayout->addWidget(newSNR, 0, 0);
+    nsrLayout->addWidget(ratioNewSamples, 0, 1);
+    layout->addWidget(newSampleRatioWidget, wid++, 0);
 
-
-    //
     // Create Advanced options
-    //
+    // advanced option widget
+    QWidget *advOptGroup = new QWidget(this);
+    QGridLayout* advOptLayout = new QGridLayout(advOptGroup);
+    advOptGroup->setLayout(advOptLayout);
+    int widd = 0;
 
     theAdvancedCheckBox = new QCheckBox();
-    theAdvancedTitle=new QLabel("\n     Advanced Options");
+    theAdvancedTitle=new QLabel("Advanced Options");
     theAdvancedTitle->setStyleSheet("font-weight: bold; color: gray");
-    layout->addWidget(theAdvancedTitle, wid, 0,1,3,Qt::AlignBottom);
-    layout->addWidget(theAdvancedCheckBox, wid++, 0,Qt::AlignBottom);
+    advOptLayout->addWidget(theAdvancedTitle, widd, 1, Qt::AlignBottom);
+    advOptLayout->addWidget(theAdvancedCheckBox, widd, 0, Qt::AlignBottom);
+    // create advanced combobox
+    theAdvancedComboBox = new QComboBox();
+    theAdvancedComboBox->addItem(tr("General"));
+    theAdvancedComboBox->addItem(tr("KDE"));
+    theAdvancedComboBox->addItem(tr("Constraints"));
+    theAdvancedComboBox->setCurrentIndex(0);
+    theAdvancedComboBox->setVisible(false);
+    advOptLayout->addWidget(theAdvancedComboBox, widd++, 2, Qt::AlignBottom);
 
+    // division line
     lineA = new QFrame;
     lineA->setFrameShape(QFrame::HLine);
     lineA->setFrameShadow(QFrame::Sunken);
     lineA->setMaximumWidth(420);
-    layout->addWidget(lineA, wid++, 0, 1, 3);
-    lineA->setVisible(false);
+    advOptLayout->addWidget(lineA, widd++, 0, 1, 3);
+    lineA->setVisible(false);    
 
-    //
-    // Use Log transform
-    //
-
+    // adv. opt. general widget
+    advGeneralWidget = new QWidget();
+    QGridLayout* advGeneralLayout = new QGridLayout(advGeneralWidget);
+    advGeneralWidget->setLayout(advGeneralLayout);
+    // Log transform
     theLogtLabel=new QLabel("Log-space Transform");
-    theLogtLabel2=new QLabel("     (check this box only when all data are always positive)");
-
+    theLogtLabel2=new QLabel("     (only if data always positive)");
     theLogtCheckBox = new QCheckBox();
-    layout->addWidget(theLogtLabel, wid, 0);
-    layout->addWidget(theLogtLabel2, wid, 1,1,-1,Qt::AlignLeft);
-    layout->addWidget(theLogtCheckBox, wid++, 1);
+    advGeneralLayout->addWidget(theLogtLabel, 0, 0);
+    advGeneralLayout->addWidget(theLogtLabel2, 0, 1,1,-1,Qt::AlignLeft);
+    advGeneralLayout->addWidget(theLogtCheckBox, 0, 1);
     theLogtLabel->setVisible(false);
     theLogtLabel2->setVisible(false);
     theLogtCheckBox->setVisible(false);
-
-    //
-    theDMLabel=new QLabel("Diffusion Maps");
-    theDMCheckBox = new QCheckBox();
-    layout->addWidget(theDMLabel, wid, 0);
-    layout->addWidget(theDMCheckBox, wid++, 1);
-    theDMLabel->setVisible(false);
-    theDMCheckBox->setVisible(false);
-    theDMCheckBox->setChecked(true);
-
-    //
-    epsilonPCA = new QLineEdit();
-    epsilonPCA->setText(tr("0.0001"));
-    epsilonPCA->setValidator(new QDoubleValidator);
-    epsilonPCA->setToolTip("PCA Tolerance");
-    epsilonPCA->setMaximumWidth(150);
-    newEpsilonPCA = new QLabel("PCA Tolerance");
-    layout->addWidget(newEpsilonPCA, wid, 0);
-    layout->addWidget(epsilonPCA, wid++, 1);
-    epsilonPCA->setVisible(false);
-    newEpsilonPCA->setVisible(false);
-
-    //
-    smootherKDE = new QLineEdit();
-    smootherKDE->setText(tr("25"));
-    smootherKDE->setValidator(new QDoubleValidator);
-    smootherKDE->setToolTip("KDE Smooth Factor");
-    smootherKDE->setMaximumWidth(150);
-    newSmootherKDE = new QLabel("KDE Smooth Factor");
-    layout->addWidget(newSmootherKDE, wid, 0);
-    layout->addWidget(smootherKDE, wid++, 1);
-    smootherKDE->setVisible(false);
-    newSmootherKDE->setVisible(false);
-
-    //
-    tolKDE = new QLineEdit();
-    tolKDE->setText(tr("0.1"));
-    tolKDE->setValidator(new QDoubleValidator);
-    tolKDE->setToolTip("KDE Tolerance: ratio between the cut-off eigenvalue and the first eigenvalue.");
-    tolKDE->setMaximumWidth(150);
-    newTolKDE = new QLabel("KDE Tolerance");
-    layout->addWidget(newTolKDE, wid, 0);
-    layout->addWidget(tolKDE, wid++, 1);
-    tolKDE->setVisible(false);
-    newTolKDE->setVisible(false);
-
-    //
+    // random seed
     randomSeed = new QLineEdit();
     randomSeed->setText(tr("10"));
     randomSeed->setValidator(new QIntValidator);
     randomSeed->setToolTip("Random Seed Number");
     randomSeed->setMaximumWidth(150);
     newRandomSeed = new QLabel("Random Seed");
-    layout->addWidget(newRandomSeed, wid, 0);
-    layout->addWidget(randomSeed, wid++, 1);
+    advGeneralLayout->addWidget(newRandomSeed, 1, 0);
+    advGeneralLayout->addWidget(randomSeed, 1, 1);
     randomSeed->setVisible(false);
     newRandomSeed->setVisible(false);
+    // pca tolerance
+    epsilonPCA = new QLineEdit();
+    epsilonPCA->setText(tr("0.0001"));
+    epsilonPCA->setValidator(new QDoubleValidator);
+    epsilonPCA->setToolTip("PCA Tolerance");
+    epsilonPCA->setMaximumWidth(150);
+    newEpsilonPCA = new QLabel("PCA Tolerance");
+    advGeneralLayout->addWidget(newEpsilonPCA, 2, 0);
+    advGeneralLayout->addWidget(epsilonPCA, 2, 1);
+    epsilonPCA->setVisible(false);
+    newEpsilonPCA->setVisible(false);
 
-    // constraints
-    QHBoxLayout *theConstraintsLayout = new QHBoxLayout();
+    // adv. opt. kde widget
+    advKDEWidget = new QWidget();
+    QGridLayout* advKDELayout = new QGridLayout(advKDEWidget);
+    advKDEWidget->setLayout(advKDELayout);
+    // kde smooth factor
+    smootherKDE = new QLineEdit();
+    smootherKDE->setText(tr("25"));
+    smootherKDE->setValidator(new QDoubleValidator);
+    smootherKDE->setToolTip("KDE Smooth Factor");
+    smootherKDE->setMaximumWidth(150);
+    newSmootherKDE = new QLabel("KDE Smooth Factor");
+    advKDELayout->addWidget(newSmootherKDE, 0, 0);
+    advKDELayout->addWidget(smootherKDE, 0, 1);
+    smootherKDE->setVisible(false);
+    newSmootherKDE->setVisible(false);
+    // diff. maps
+    theDMLabel=new QLabel("Diffusion Maps");
+    theDMCheckBox = new QCheckBox();
+    advKDELayout->addWidget(theDMLabel, 1, 0);
+    advKDELayout->addWidget(theDMCheckBox, 1, 1);
+    theDMLabel->setVisible(false);
+    theDMCheckBox->setVisible(false);
+    theDMCheckBox->setChecked(true);
+    // diff. maps tolerance
+    tolKDE = new QLineEdit();
+    tolKDE->setText(tr("0.1"));
+    tolKDE->setValidator(new QDoubleValidator);
+    tolKDE->setToolTip("Diffusion Maps Tolerance: ratio between the cut-off eigenvalue and the first eigenvalue.");
+    tolKDE->setMaximumWidth(150);
+    newTolKDE = new QLabel("Diff. Maps Tolerance");
+    advKDELayout->addWidget(newTolKDE, 2, 0);
+    advKDELayout->addWidget(tolKDE, 2, 1);
+    tolKDE->setVisible(false);
+    newTolKDE->setVisible(false);
+    tolKDE->setDisabled(false);
+    connect(theDMCheckBox,SIGNAL(toggled(bool)),this,SLOT(setDiffMaps(bool)));
+
+    // adv. opt. constraints widget
+    advConstraintsWidget = new QWidget();
+    QGridLayout* advConstraintsLayout = new QGridLayout(advConstraintsWidget);
+    advConstraintsWidget->setLayout(advConstraintsLayout);
+    //
     theConstraintsButton = new QCheckBox();
     theConstraintsLabel2 = new QLabel();
     theConstraintsLabel2->setText("Add constratins");
-    theConstraintsLayout->addWidget(theConstraintsLabel2,0);
-    theConstraintsLayout->addWidget(theConstraintsLabel2,1);
     constraintsPath = new QLineEdit();
     chooseConstraints = new QPushButton(tr("Choose"));
     connect(chooseConstraints, &QPushButton::clicked, this, [=](){
         constraintsPath->setText(QFileDialog::getOpenFileName(this,tr("Open File"),"", "All files (*.*)"));
     });
-    constraintsPath->setMinimumWidth(200);
     constraintsPath->setReadOnly(true);
     theConstraintsLabel1 = new QLabel();
     theConstraintsLabel1->setText("Constraints file (.py)");
-    layout->addWidget(theConstraintsLabel1,wid,0,Qt::AlignTop);
-    layout->addWidget(constraintsPath,wid,1,1,3,Qt::AlignTop);
-    layout->addWidget(chooseConstraints,wid,4,Qt::AlignTop);
-    layout->addWidget(theConstraintsButton,wid,5,Qt::AlignTop);
-    layout->addWidget(theConstraintsLabel2,wid++,6,Qt::AlignTop);
+    advConstraintsLayout->addWidget(theConstraintsButton,0,1,Qt::AlignTop);
+    advConstraintsLayout->addWidget(theConstraintsLabel2,0,0,Qt::AlignTop);
+    advConstraintsLayout->addWidget(theConstraintsLabel1,1,0,Qt::AlignTop);
+    advConstraintsLayout->addWidget(constraintsPath,1,1,1,2,Qt::AlignTop);
+    advConstraintsLayout->addWidget(chooseConstraints,1,3,Qt::AlignTop);
     constraintsPath->setVisible(false);
     theConstraintsLabel1->setVisible(false);
     theConstraintsLabel2->setVisible(false);
@@ -299,10 +295,8 @@ PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *fe
     theConstraintsButton->setVisible(false);
     constraintsPath->setDisabled(1);
     chooseConstraints->setDisabled(1);
-    chooseConstraints->setStyleSheet("background-color: lightgrey;border-color:grey");
     constraintsPath->setStyleSheet("background-color: lightgrey;border-color:grey");
     connect(theConstraintsButton,SIGNAL(toggled(bool)),this,SLOT(setConstraints(bool)));
-
     // iterations when applying constraints
     numIter = new QLineEdit();
     numIter->setText(tr("50"));
@@ -310,25 +304,39 @@ PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *fe
     numIter->setToolTip("Iteration Number");
     numIter->setMaximumWidth(150);
     numIterLabel = new QLabel("Iteration Number");
-    layout->addWidget(numIterLabel, wid, 0);
-    layout->addWidget(numIter, wid++, 1);
+    advConstraintsLayout->addWidget(numIterLabel, 2, 0);
+    advConstraintsLayout->addWidget(numIter, 2, 1);
     numIter->setVisible(false);
     numIterLabel->setVisible(false);
     numIter->setDisabled(1);
     numIter->setStyleSheet("background-color: lightgrey;border-color:grey");
-
+    // iteration tol
     tolIter = new QLineEdit();
     tolIter->setText(tr("0.02"));
     tolIter->setValidator(new QDoubleValidator);
     tolIter->setToolTip("Iteration Tolerance");
     tolIter->setMaximumWidth(150);
     tolIterLabel = new QLabel("Iteration Tolerance");
-    layout->addWidget(tolIterLabel, wid, 0);
-    layout->addWidget(tolIter, wid++, 1);
+    advConstraintsLayout->addWidget(tolIterLabel, 3, 0);
+    advConstraintsLayout->addWidget(tolIter, 3, 1);
     tolIter->setVisible(false);
     tolIterLabel->setVisible(false);
     tolIter->setDisabled(1);
     tolIter->setStyleSheet("background-color: lightgrey;border-color:grey");
+
+    // create the stacked widgets
+    adv_stackedWidgets = new QStackedWidget(this);
+    adv_stackedWidgets->addWidget(advGeneralWidget);
+    adv_stackedWidgets->addWidget(advKDEWidget);
+    adv_stackedWidgets->addWidget(advConstraintsWidget);
+    adv_stackedWidgets->setCurrentIndex(0);
+    connect(theAdvancedComboBox, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int id)
+    {
+        adv_stackedWidgets->setCurrentIndex(id);
+    });
+    advOptLayout->addWidget(adv_stackedWidgets, widd++, 1);
+
+    layout->addWidget(advOptGroup, wid++, 0);
 
     //
     // Finish
@@ -343,8 +351,6 @@ PLoMInputWidget::PLoMInputWidget(InputWidgetParameters *param,InputWidgetFEM *fe
     //chooseOutFile->setStyleSheet("background-color: lightgrey;border-color:grey");
 
     connect(theAdvancedCheckBox,SIGNAL(toggled(bool)),this,SLOT(doAdvancedSetup(bool)));
-
-
 }
 
 
@@ -364,6 +370,7 @@ void PLoMInputWidget::doAdvancedSetup(bool tog)
         theLogtCheckBox->setChecked(false);
     }
 
+    theAdvancedComboBox->setVisible(tog);
     lineA->setVisible(tog);
     theLogtCheckBox->setVisible(tog);
     theLogtLabel->setVisible(tog);
@@ -418,7 +425,6 @@ void PLoMInputWidget::setConstraints(bool tog)
     if (tog) {
         constraintsPath->setDisabled(0);
         chooseConstraints->setDisabled(0);
-        chooseConstraints->setStyleSheet("background-color: white");
         constraintsPath->setStyleSheet("color: white");
         numIter->setStyleSheet("background-color: white");
         tolIter->setStyleSheet("background-color: white");
@@ -427,12 +433,22 @@ void PLoMInputWidget::setConstraints(bool tog)
     } else {
         constraintsPath->setDisabled(1);
         chooseConstraints->setDisabled(1);
-        chooseConstraints->setStyleSheet("background-color: lightgrey;border-color:grey");
         constraintsPath->setStyleSheet("background-color: lightgrey;border-color:grey");
         numIter->setStyleSheet("background-color: lightgrey;border-color:grey");
         tolIter->setStyleSheet("background-color: lightgrey;border-color:grey");
         numIter->setDisabled(1);
         tolIter->setDisabled(1);
+    }
+}
+
+void PLoMInputWidget::setDiffMaps(bool tog)
+{
+    if (tog) {
+        tolKDE->setDisabled(0);
+        tolKDE->setStyleSheet("background-color: white");
+    } else {
+        tolKDE->setDisabled(1);
+        tolKDE->setStyleSheet("background-color: lightgrey;border-color:grey");
     }
 }
 
